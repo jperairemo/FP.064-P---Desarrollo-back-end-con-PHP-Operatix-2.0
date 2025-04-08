@@ -127,5 +127,106 @@ class ReservaController {
             echo "Error al obtener la reserva: " . $e->getMessage();
         }
     }
+
+    // Método para modificar una reserva existente
+    public function modificarReserva($data) {
+    global $pdo;
+
+    // Validar que los datos necesarios estén presentes
+    if (!isset($data['id_reserva'], $data['fecha_entrada'], $data['hora_entrada'], $data['num_viajeros'])) {
+        echo "Faltan datos para modificar la reserva.";
+        return;
+    }
+
+    // Consulta preparada para actualizar la reserva
+    $stmt = $pdo->prepare("UPDATE transfer_reservas SET 
+        fecha_entrada = ?, 
+        hora_entrada = ?, 
+        num_viajeros = ? 
+        WHERE id_reserva = ?");
+
+    // Ejecutar la consulta
+    $stmt->execute([
+        $data['fecha_entrada'],
+        $data['hora_entrada'],
+        $data['num_viajeros'],
+        $data['id_reserva']
+    ]);
+
+    echo "Reserva modificada con éxito.";
+    }
+
+
+    // Método para eliminar una reserva
+    public function eliminarReserva($id_reserva) {
+    global $pdo;
+
+    // Verificar si la reserva puede ser cancelada (por ejemplo, más de 48 horas antes)
+    $stmt = $pdo->prepare("SELECT fecha_entrada FROM transfer_reservas WHERE id_reserva = ?");
+    $stmt->execute([$id_reserva]);
+    $reserva = $stmt->fetch();
+
+    if ($reserva) {
+        $fecha_entrada = new DateTime($reserva['fecha_entrada']);
+        $hoy = new DateTime();
+
+        // Si la reserva está dentro de las 48 horas, no permitir la cancelación
+        if ($hoy->diff($fecha_entrada)->days <= 2) {
+            echo "No se puede cancelar la reserva, ya que está dentro de las 48 horas.";
+            return;
+        }
+
+        // Eliminar la reserva
+        $stmt = $pdo->prepare("DELETE FROM transfer_reservas WHERE id_reserva = ?");
+        $stmt->execute([$id_reserva]);
+
+        echo "Reserva eliminada con éxito.";
+    } else {
+        echo "Reserva no encontrada.";
+    }
+    }
+
+
+
+    // Método para obtener reservas por fecha (por día, semana, mes)
+    public function obtenerReservasPorFecha($fecha_inicio, $fecha_fin) {
+        global $pdo;
+
+        try {
+            // Consulta para obtener las reservas dentro del rango de fechas
+            $stmt = $pdo->prepare("SELECT * FROM transfer_reservas WHERE fecha_entrada BETWEEN ? AND ?");
+            $stmt->execute([$fecha_inicio, $fecha_fin]);
+
+            // Array para almacenar las reservas dentro del rango
+            $reservas = [];
+            while ($fila = $stmt->fetch()) {
+                $reserva = new Reserva(
+                    $fila['id_reserva'],
+                    $fila['localizador'],
+                    $fila['id_hotel'],
+                    $fila['id_tipo_reserva'],
+                    $fila['email_cliente'],
+                    $fila['fecha_reserva'],
+                    $fila['fecha_modificacion'],
+                    $fila['id_destino'],
+                    $fila['fecha_entrada'],
+                    $fila['hora_entrada'],
+                    $fila['numero_vuelo_entrada'],
+                    $fila['origen_vuelo_entrada'],
+                    $fila['hora_vuelo_salida'],
+                    $fila['fecha_vuelo_salida'],
+                    $fila['num_viajeros'],
+                    $fila['id_vehiculo']
+                );
+                $reservas[] = $reserva;
+            }
+
+            return $reservas; // Devolvemos el array de reservas
+        } catch (PDOException $e) {
+            echo "Error al obtener las reservas: " . $e->getMessage();
+    }
+}
+
+
 }
 ?>
